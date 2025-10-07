@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths-ignore:
       - "website/**"
+  workflow_dispatch: {}
 
 jobs:
   build:
