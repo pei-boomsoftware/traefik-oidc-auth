@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestSetChunkedCookiesNonChunked(t *testing.T) {
@@ -215,3 +216,100 @@ func randomFixedLengthString(n int) string {
 	}
 	return string(b)
 }
+
+func TestParseCookieSameSite(t *testing.T) {
+	// Test all supported SameSite values
+	testCases := []struct {
+		input    string
+		expected http.SameSite
+	}{
+		{"none", http.SameSiteNoneMode},
+		{"lax", http.SameSiteLaxMode},
+		{"strict", http.SameSiteStrictMode},
+		{"default", http.SameSiteDefaultMode},
+		{"unknown", http.SameSiteDefaultMode},
+		{"", http.SameSiteDefaultMode},
+	}
+	
+	for _, tc := range testCases {
+		result := parseCookieSameSite(tc.input)
+		if result != tc.expected {
+			t.Errorf("parseCookieSameSite(%q) = %v, expected %v", tc.input, result, tc.expected)
+		}
+	}
+}
+
+func TestMakeCookieExpireImmediately(t *testing.T) {
+	cookie := &http.Cookie{
+		Name:  "test-cookie",
+		Value: "test-value",
+	}
+	
+	// Make cookie expire
+	result := makeCookieExpireImmediately(cookie)
+	
+	// Should be the same cookie object
+	if result != cookie {
+		t.Errorf("Expected same cookie object")
+	}
+	
+	// Should have negative MaxAge
+	if result.MaxAge != -1 {
+		t.Errorf("Expected MaxAge -1, got %d", result.MaxAge)
+	}
+	
+	// Should have past expiry time
+	if result.Expires.After(time.Now()) {
+		t.Errorf("Expected past expiry time, got %v", result.Expires)
+	}
+}
+
+func TestGetCodeVerifierCookieName(t *testing.T) {
+	config := &Config{
+		CookieNamePrefix: "TestApp",
+	}
+	
+	result := getCodeVerifierCookieName(config)
+	expected := "TestApp.CodeVerifier"
+	
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
+func TestGetSessionCookieName(t *testing.T) {
+	config := &Config{
+		CookieNamePrefix: "TestApp",
+	}
+	
+	result := getSessionCookieName(config)
+	expected := "TestApp.Session"
+	
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
+func TestMakeCookieName(t *testing.T) {
+	config := &Config{
+		CookieNamePrefix: "MyApp",
+	}
+	
+	testCases := []struct {
+		name     string
+		expected string
+	}{
+		{"Session", "MyApp.Session"},
+		{"CodeVerifier", "MyApp.CodeVerifier"},
+		{"CustomName", "MyApp.CustomName"},
+	}
+	
+	for _, tc := range testCases {
+		result := makeCookieName(config, tc.name)
+		if result != tc.expected {
+			t.Errorf("makeCookieName(%q) = %q, expected %q", tc.name, result, tc.expected)
+		}
+	}
+}
+
+

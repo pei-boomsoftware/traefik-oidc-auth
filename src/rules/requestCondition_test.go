@@ -272,3 +272,84 @@ func TestRequestConditionQueryRegexp(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestRequestConditionLogicalOr(t *testing.T) {
+	logger := logging.CreateLogger(logging.LevelDebug)
+
+	rule, _ := ParseRequestCondition("PathPrefix(`/api`) || Method(`POST`)")
+
+	// Test first condition matches
+	request, _ := http.NewRequest(http.MethodGet, "http://test/api/users", nil)
+	result := rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	// Test second condition matches
+	request, _ = http.NewRequest(http.MethodPost, "http://test/other", nil)
+	result = rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	// Test neither condition matches
+	request, _ = http.NewRequest(http.MethodGet, "http://test/other", nil)
+	result = rule.Match(logger, request)
+
+	if result {
+		t.Fail()
+	}
+}
+
+func TestRequestConditionComplexExpression(t *testing.T) {
+	logger := logging.CreateLogger(logging.LevelDebug)
+
+	rule, _ := ParseRequestCondition("(PathPrefix(`/api`) && Method(`GET`)) || Header(`Authorization`, `Bearer token`)")
+
+	// Test first part of OR (both conditions true)
+	request, _ := http.NewRequest(http.MethodGet, "http://test/api/users", nil)
+	result := rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	// Test second part of OR (header matches)
+	request, _ = http.NewRequest(http.MethodPost, "http://test/other", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	result = rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	// Test neither condition matches
+	request, _ = http.NewRequest(http.MethodPost, "http://test/other", nil)
+	result = rule.Match(logger, request)
+
+	if result {
+		t.Fail()
+	}
+}
+
+func TestParseRequestConditionError(t *testing.T) {
+	// Test with invalid syntax
+	_, err := ParseRequestCondition("InvalidFunction(`test`)")
+	if err == nil {
+		t.Errorf("Expected error for invalid function")
+	}
+
+	// Test with malformed expression
+	_, err = ParseRequestCondition("Header(`test`")
+	if err == nil {
+		t.Errorf("Expected error for malformed expression")
+	}
+
+	// Test with invalid arguments
+	_, err = ParseRequestCondition("Header()")
+	if err == nil {
+		t.Errorf("Expected error for missing arguments")
+	}
+}
